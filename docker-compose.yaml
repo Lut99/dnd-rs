@@ -1,0 +1,23 @@
+version: '3.6'
+
+services:
+  ##### DND PROJECT #####
+  # The DnD server
+  dnd-server:
+    build:
+      dockerfile: ./Dockerfile
+      context: .
+      target: run
+    container_name: dnd-server
+    user: dnd
+    restart: always
+    # command:
+    ports:
+    - 4200:4200
+    volumes:
+    - ./config:/config
+    - ./data:/data
+
+networks:
+  dnd:
+    driver: default

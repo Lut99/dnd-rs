@@ -1,5 +1,5 @@
 [package]
-name = "dnd"
+name = "dnd-server"
 version = "0.1.0"
 edition = "2021"
 authors = ["Lut99"]
@@ -9,6 +9,7 @@ description = "A server that hosts a website to play DnD with your friends!"
 
 [dependencies]
 argon2 = { version = "0.5", features = ["std"] }
+async-sqlite = "0.2"
 axum = "0.7"
 axum-extra = { version = "0.9", features = ["cookie", "cookie-private"] }
 axum-macros = { version = "0.4", optional = true }
