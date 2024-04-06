@@ -1,0 +1,31 @@
+[package]
+name = "dnd"
+version = "0.1.0"
+edition = "2021"
+authors = ["Lut99"]
+repository = "https://github.com/Lut99/dnd-rs"
+description = "A server that hosts a website to play DnD with your friends!"
+
+
+[dependencies]
+argon2 = { version = "0.5", features = ["std"] }
+axum = "0.7"
+axum-extra = { version = "0.9", features = ["cookie", "cookie-private"] }
+axum-macros = { version = "0.4", optional = true }
+chrono = "0.4"
+clap = { version = "4.5", features = ["derive"] }
+error-trace = { git = "https://github.com/Lut99/error-trace-rs" }
+humanlog = { git = "https://github.com/Lut99/humanlog-rs" }
+hyper = "1.2"
+hyper-util = { version = "0.1", default-features = false, features = ["server"] }
+log = "0.4"
+rustls-pemfile = "2.1"
+tokio = { version = "1.33", default-features = false, features = ["macros", "rt", "rt-multi-thread", "signal"]}
+tokio-rustls = "0.26"
+tower = { version = "0.4", features = ["make"] }
+tower-service = "0.3"
+
+
+[features]
+default = []
+axum-debug = ["dep:axum-macros"]
