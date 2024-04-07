@@ -8,7 +8,7 @@ FROM rust:1-alpine3.19 AS build
 
 # Add additional dependencies
 RUN apk add --no-cache \
-    musl-dev \
+    musl-dev make cmake \
     openssl-dev openssl-libs-static pkgconf
 
 # Copy over the source

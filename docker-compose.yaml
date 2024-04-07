@@ -8,6 +8,9 @@ services:
       dockerfile: ./Dockerfile
       context: .
       target: run
+      args:
+        UID: ${UID:-1000}
+        GID: ${GID:-1000}
     container_name: dnd-server
     user: dnd
     restart: always

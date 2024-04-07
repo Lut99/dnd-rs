@@ -10,6 +10,7 @@ description = "A server that hosts a website to play DnD with your friends!"
 [dependencies]
 argon2 = { version = "0.5", features = ["std"] }
 async-sqlite = "0.2"
+# async-sqlite = { version = "0.2", default-features = false }
 axum = "0.7"
 axum-extra = { version = "0.9", features = ["cookie", "cookie-private"] }
 axum-macros = { version = "0.4", optional = true }
@@ -21,8 +22,10 @@ hyper = "1.2"
 hyper-util = { version = "0.1", default-features = false, features = ["server"] }
 log = "0.4"
 rustls-pemfile = "2.1"
-tokio = { version = "1.33", default-features = false, features = ["macros", "rt", "rt-multi-thread", "signal"]}
+serde = { version = "1.0", features = ["derive"] }
+tokio = { version = "1.33", default-features = false, features = ["fs", "macros", "rt", "rt-multi-thread", "signal"]}
 tokio-rustls = "0.26"
+toml = "0.8"
 tower = { version = "0.4", features = ["make"] }
 tower-service = "0.3"
 
