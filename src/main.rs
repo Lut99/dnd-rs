@@ -4,7 +4,7 @@
 //  Created:
 //    06 Apr 2024, 15:12:56
 //  Last edited:
-//    08 Apr 2024, 11:57:38
+//    08 Apr 2024, 12:42:34
 //  Auto updated?
 //    Yes
 //
@@ -102,6 +102,9 @@ fn main() {
         }
     }
 
+
+
+    /* PATH BUILDING */
     // Create a runtime state out of that
     let state: Arc<ServerState> = ServerState::arced(db);
 }
