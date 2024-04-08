@@ -4,7 +4,7 @@
 //  Created:
 //    06 Apr 2024, 15:12:56
 //  Last edited:
-//    07 Apr 2024, 14:44:57
+//    08 Apr 2024, 11:57:38
 //  Auto updated?
 //    Yes
 //
@@ -12,11 +12,13 @@
 //!   Entrypoint to the DnD server binary.
 //
 
-use std::fs::{self, File};
+use std::fs;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use clap::Parser;
 use dnd_server::database::Database;
+use dnd_server::state::ServerState;
 use error_trace::trace;
 use humanlog::{DebugMode, HumanLogger};
 use log::{debug, error, info};
@@ -43,8 +45,7 @@ struct Arguments {
 
 
 /***** LIBRARY *****/
-#[tokio::main]
-async fn main() {
+fn main() {
     // Parse CLI args
     let args = Arguments::parse();
 
@@ -60,11 +61,7 @@ async fn main() {
     // Touch the database file alive if it doesn't exist
     let needs_init: bool = if !args.data_path.exists() {
         // Doesn't exist; touch the file and return it needs initing
-        debug!("Database file '{}' does not exist, creating file...", args.data_path.display());
-        if let Err(err) = File::create(&args.data_path) {
-            error!("{}", trace!(("Failed to touch database file '{}'", args.data_path.display()), err));
-            std::process::exit(1);
-        }
+        debug!("Database file '{}' does not exist", args.data_path.display());
         true
     } else {
         // Already exists, no init please
@@ -88,7 +85,7 @@ async fn main() {
     };
 
     // Open a connection to the database
-    let db: Database = match Database::sqlite(&args.data_path) {
+    let mut db: Database = match Database::sqlite(&args.data_path) {
         Ok(db) => db,
         Err(err) => {
             error!("{}", trace!(("Failed to setup database"), err));
@@ -99,9 +96,12 @@ async fn main() {
     // If it needs initialization, do so
     if needs_init {
         debug!("Initializing database...");
-        if let Err(err) = db.init(&args.root_path).await {
+        if let Err(err) = db.init(&args.root_path) {
             error!("{}", trace!(("Failed to initialize database file '{}'", args.data_path.display()), err));
             std::process::exit(1);
         }
     }
+
+    // Create a runtime state out of that
+    let state: Arc<ServerState> = ServerState::arced(db);
 }

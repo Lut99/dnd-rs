@@ -28,7 +28,7 @@ mkdir -p data || exit "$?"
 ##### GENERATE ROOT PASSWORD #####
 echo " > Generating root credentials to 'config/root.toml'"
 pass=$(openssl rand -hex 32) || exit "$?"
-bash -c "printf \"[credentials]\\nname=\\\"root\\\"\\npass=\\\"$pass\\\"\\n\" > config/root.toml" || exit "$?"
+bash -c "printf \"[root.creds]\\nname=\\\"root\\\"\\npass=\\\"$pass\\\"\\n\" > config/root.toml" || exit "$?"
 
 
 

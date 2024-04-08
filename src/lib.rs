@@ -4,7 +4,7 @@
 //  Created:
 //    06 Apr 2024, 15:25:37
 //  Last edited:
-//    06 Apr 2024, 15:25:58
+//    08 Apr 2024, 11:55:24
 //  Auto updated?
 //    Yes
 //
@@ -16,4 +16,8 @@
 //
 
 // Declare modules
+pub mod auth;
 pub mod database;
+pub mod middleware;
+pub mod paths;
+pub mod state;
