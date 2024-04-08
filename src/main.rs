@@ -4,7 +4,7 @@
 //  Created:
 //    06 Apr 2024, 15:12:56
 //  Last edited:
-//    08 Apr 2024, 12:42:34
+//    08 Apr 2024, 17:35:47
 //  Auto updated?
 //    Yes
 //
@@ -16,8 +16,11 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use axum::routing::get;
+use axum::Router;
 use clap::Parser;
 use dnd_server::database::Database;
+use dnd_server::paths;
 use dnd_server::state::ServerState;
 use error_trace::trace;
 use humanlog::{DebugMode, HumanLogger};
@@ -107,4 +110,7 @@ fn main() {
     /* PATH BUILDING */
     // Create a runtime state out of that
     let state: Arc<ServerState> = ServerState::arced(db);
+
+    // Build the health path
+    let version = Router::new().route("/version", get(paths::version::handle));
 }
