@@ -4,10 +4,13 @@
 //  Created:
 //    08 Apr 2024, 11:44:55
 //  Last edited:
-//    08 Apr 2024, 11:45:00
+//    09 Apr 2024, 12:57:50
 //  Auto updated?
 //    Yes
 //
 //  Description:
 //!   Defines handlers acting as middleware before API paths.
 //
+
+// Declare submodules
+pub mod auth;

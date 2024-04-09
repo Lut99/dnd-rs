@@ -4,7 +4,7 @@
 //  Created:
 //    08 Apr 2024, 11:36:08
 //  Last edited:
-//    09 Apr 2024, 12:37:13
+//    09 Apr 2024, 13:02:31
 //  Auto updated?
 //    Yes
 //
@@ -25,12 +25,15 @@ use log::debug;
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
 
-use crate::database::Database;
+use crate::database::{Database, UserInfo};
 
 
 /***** CONSTANTS *****/
 /// The time that a token is valid.
 pub const TOKEN_VALID_TIME_MIN: i64 = 360;
+
+/// The name of the login token cookie.
+pub const LOGIN_TOKEN_NAME: &'static str = "login-token";
 
 
 
@@ -264,12 +267,12 @@ pub fn create_token(id: u64, role: Role) -> Result<String, TokenError> {
 /// - `token`: Some opaque string token that we will check.
 ///
 /// # Returns
-/// A [`LoginToken`] that describes the information extracted from the `token`, or [`Err`] describing why the token was no longer valid.
+/// A [`UserInfo`] that describes the information of the logged-in user, or a [`TokenInvalid`] describing why the token was no longer valid.
 ///
 /// # Errors
 /// This function errors if we failed to use the given database.
 #[inline]
-pub fn check_token(database: &Database, token: &str) -> Result<Result<LoginToken, TokenInvalid>, TokenError> {
+pub fn check_token(database: &Database, token: &str) -> Result<Result<UserInfo, TokenInvalid>, TokenError> {
     match serde_json::from_str::<LoginToken>(token) {
         Ok(token) => {
             debug!("Got presented login token '{token:?}'");
@@ -286,7 +289,7 @@ pub fn check_token(database: &Database, token: &str) -> Result<Result<LoginToken
                 Ok(Some(user)) => {
                     // Finally, check if the role in the token is what we know of the user in the database
                     if user.role == token.role {
-                        Ok(Ok(token))
+                        Ok(Ok(user))
                     } else {
                         Ok(Err(TokenInvalid::IncorrectRole { id: user.id, got: token.role, expected: user.role }))
                     }

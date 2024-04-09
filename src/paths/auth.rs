@@ -4,7 +4,7 @@
 //  Created:
 //    09 Apr 2024, 12:18:07
 //  Last edited:
-//    09 Apr 2024, 12:49:44
+//    09 Apr 2024, 12:56:54
 //  Auto updated?
 //    Yes
 //
@@ -27,18 +27,10 @@ use hyper::StatusCode;
 use log::{debug, error, info};
 use serde::{Deserialize, Serialize};
 
-use crate::auth::{check_password, check_token, create_token};
+use crate::auth::{check_password, check_token, create_token, LOGIN_TOKEN_NAME};
 use crate::database::UserInfo;
 use crate::spec::Path;
 use crate::state::ServerState;
-
-
-/***** CONSTANTS *****/
-/// The name of the login token cookie.
-pub const LOGIN_TOKEN_NAME: &'static str = "login-token";
-
-
-
 
 
 /***** SPEC *****/
