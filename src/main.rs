@@ -4,7 +4,7 @@
 //  Created:
 //    06 Apr 2024, 15:12:56
 //  Last edited:
-//    09 Apr 2024, 12:50:08
+//    09 Apr 2024, 13:22:11
 //  Auto updated?
 //    Yes
 //
@@ -31,6 +31,7 @@ use semver::Version;
 use tokio::net::TcpListener;
 use tokio::runtime::{Builder, Runtime};
 use tokio::signal::unix::{signal, Signal, SignalKind};
+use tower_http::services::ServeDir;
 
 
 /***** ARGUMENTS *****/
@@ -43,13 +44,16 @@ struct Arguments {
 
     /// The address on which to host the server.
     #[clap(short, long, global = true, default_value = "0.0.0.0:4200")]
-    address:   SocketAddr,
+    address:     SocketAddr,
+    /// The path to the client files.
+    #[clap(short, long, global = true, default_value = concat!(env!("CARGO_MANIFEST_DIR"), "/src/client"))]
+    client_path: PathBuf,
     /// The path to the persistent data file.
     #[clap(short, long, global = true, default_value = "/data/data.db")]
-    data_path: PathBuf,
+    data_path:   PathBuf,
     /// The path to the root's credentials file. This is only used if the database needs to be initialized to generate the root user.
     #[clap(short, long, global = true, default_value = "/config/root.toml")]
-    root_path: PathBuf,
+    root_path:   PathBuf,
 }
 
 
@@ -114,11 +118,22 @@ fn main() {
     // Create a runtime state out of that
     let state: ServerState = ServerState::new(env!("CARGO_BIN_NAME"), Version::from_str(env!("CARGO_PKG_VERSION")).unwrap(), db);
 
-    // Build the health path
-    debug!("Building axum paths...");
+    // Build the API paths
+    debug!("Building axum API paths...");
     let auth: Router = Router::new().route("/auth/login", post(paths::auth::login)).with_state(state.clone());
     let version: Router = Router::new().route("/version", get(paths::version::handle)).with_state(state);
-    let routes: Router = Router::new().nest("/v1", auth).nest("/v1", version);
+    let api: Router = Router::new().nest("/v1", auth).nest("/v1", version);
+
+    // Build the file server paths
+    debug!("Building axum file paths...");
+    // TODO: Write some better wrapper around `ServeDir` that logs and can do stuff like redirecting to the login page if not logged-in.
+    let main: Router = Router::new()
+        .nest_service("/", ServeDir::new(args.client_path.join("index.html")))
+        .nest_service("/index.html", ServeDir::new(args.client_path.join("index.html")));
+    let files: Router = Router::new().nest("/", main);
+
+    // Join them
+    let routes: Router = Router::new().nest("/", api).nest("/", files);
 
 
 

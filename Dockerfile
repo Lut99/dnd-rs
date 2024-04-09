@@ -41,6 +41,9 @@ RUN adduser -u $UID -G dnd -g "DnD" -D dnd
 # Copy the binary from the build
 COPY --chown=dnd:dnd --from=build /source/dnd-server /dnd-server
 
+# Copy the client files
+COPY --chown=dnd:dnd src/client /home/dnd/client
+
 # Alrighty define the entrypoint and be done with it
 USER dnd
-ENTRYPOINT [ "/dnd-server" ]
+ENTRYPOINT [ "/dnd-server", "--client-path", "/home/dnd/client" ]
