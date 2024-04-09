@@ -4,7 +4,7 @@
 //  Created:
 //    06 Apr 2024, 15:25:37
 //  Last edited:
-//    08 Apr 2024, 11:55:24
+//    09 Apr 2024, 12:15:53
 //  Auto updated?
 //    Yes
 //
@@ -20,4 +20,5 @@ pub mod auth;
 pub mod database;
 pub mod middleware;
 pub mod paths;
+pub mod spec;
 pub mod state;

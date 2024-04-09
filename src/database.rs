@@ -4,7 +4,7 @@
 //  Created:
 //    06 Apr 2024, 15:26:16
 //  Last edited:
-//    08 Apr 2024, 12:30:00
+//    09 Apr 2024, 12:00:12
 //  Auto updated?
 //    Yes
 //
@@ -187,8 +187,6 @@ pub enum Database {
     SQLite {
         /// The path to the database file we use for debugging.
         path: PathBuf,
-        /// The SQLite [`Connection`] which we use to talk to the database.
-        conn: Connection,
     },
 }
 impl Database {
@@ -203,15 +201,7 @@ impl Database {
     /// # Errors
     /// This function errors if we failed to build a connection pool to that database.
     #[inline]
-    pub fn sqlite(path: impl Into<PathBuf>) -> Result<Self, Error> {
-        // Build a connection to the path
-        let path: PathBuf = path.into();
-        debug!("Initializing Database with SQLite backend to database file '{}'...", path.display());
-        match Connection::open(&path) {
-            Ok(conn) => Ok(Self::SQLite { path, conn }),
-            Err(err) => Err(Error::SQLite(SQLiteError::ConnCreate { path, err })),
-        }
-    }
+    pub fn sqlite(path: impl Into<PathBuf>) -> Self { Self::SQLite { path: path.into() } }
 
     /// Initializes the backend database with the required tables and such.
     ///
@@ -220,7 +210,7 @@ impl Database {
     ///
     /// # Errors
     /// This function can error if we failed to write to the backend database.
-    pub fn init(&mut self, root_path: impl AsRef<Path>) -> Result<(), Error> {
+    pub fn init(&self, root_path: impl AsRef<Path>) -> Result<(), Error> {
         // Load the root config file
         let root_path: &Path = root_path.as_ref();
         debug!("Loading root credentials file '{}'...", root_path.display());
@@ -236,8 +226,14 @@ impl Database {
 
         // Now initialize based on the backend
         match self {
-            Self::SQLite { path, conn } => {
+            Self::SQLite { path } => {
                 debug!("Initializing database file '{}'...", path.display());
+
+                // Create a connection
+                let mut conn: Connection = match Connection::open(&path) {
+                    Ok(conn) => conn,
+                    Err(err) => return Err(Error::SQLite(SQLiteError::ConnCreate { path: path.clone(), err })),
+                };
 
                 // Open a transaction
                 let trans: Transaction = match conn.transaction() {
@@ -297,7 +293,14 @@ impl Database {
     pub fn get_user_by_id(&self, id: u64) -> Result<Option<UserInfo>, Error> {
         debug!("Retrieving user info by ID for user {id}...");
         match self {
-            Self::SQLite { path, conn } => {
+            Self::SQLite { path } => {
+                // Create a connection
+                let conn: Connection = match Connection::open(&path) {
+                    Ok(conn) => conn,
+                    Err(err) => return Err(Error::SQLite(SQLiteError::ConnCreate { path: path.clone(), err })),
+                };
+
+                // Run the query
                 let query: &'static str = "SELECT * FROM users WHERE id=?";
                 match conn
                     .query_row(query, [id], |row| {

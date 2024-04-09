@@ -4,7 +4,7 @@
 //  Created:
 //    06 Apr 2024, 15:12:56
 //  Last edited:
-//    08 Apr 2024, 17:35:47
+//    09 Apr 2024, 12:13:45
 //  Auto updated?
 //    Yes
 //
@@ -13,7 +13,10 @@
 //
 
 use std::fs;
+use std::future::IntoFuture as _;
+use std::net::SocketAddr;
 use std::path::PathBuf;
+use std::str::FromStr as _;
 use std::sync::Arc;
 
 use axum::routing::get;
@@ -25,6 +28,10 @@ use dnd_server::state::ServerState;
 use error_trace::trace;
 use humanlog::{DebugMode, HumanLogger};
 use log::{debug, error, info};
+use semver::Version;
+use tokio::net::TcpListener;
+use tokio::runtime::{Builder, Runtime};
+use tokio::signal::unix::{signal, Signal, SignalKind};
 
 
 /***** ARGUMENTS *****/
@@ -35,6 +42,9 @@ struct Arguments {
     #[clap(short, long, global = true)]
     verbose: bool,
 
+    /// The address on which to host the server.
+    #[clap(short, long, global = true, default_value = "0.0.0.0:4200")]
+    address:   SocketAddr,
     /// The path to the persistent data file.
     #[clap(short, long, global = true, default_value = "/data/data.db")]
     data_path: PathBuf,
@@ -88,13 +98,7 @@ fn main() {
     };
 
     // Open a connection to the database
-    let mut db: Database = match Database::sqlite(&args.data_path) {
-        Ok(db) => db,
-        Err(err) => {
-            error!("{}", trace!(("Failed to setup database"), err));
-            std::process::exit(1);
-        },
-    };
+    let db: Database = Database::sqlite(&args.data_path);
 
     // If it needs initialization, do so
     if needs_init {
@@ -109,8 +113,60 @@ fn main() {
 
     /* PATH BUILDING */
     // Create a runtime state out of that
-    let state: Arc<ServerState> = ServerState::arced(db);
+    let state: Arc<ServerState> = ServerState::arced(env!("CARGO_BIN_NAME"), Version::from_str(env!("CARGO_PKG_VERSION")).unwrap(), db);
 
     // Build the health path
-    let version = Router::new().route("/version", get(paths::version::handle));
+    debug!("Building axum paths...");
+    let version: Router = Router::new().route("/version", get(paths::version::handle)).with_state(state);
+    let routes: Router = Router::new().nest("/v1", version);
+
+
+
+    /* EXECUTION */
+    // Build a tokio runtime to enter async mode
+    debug!("Building tokio runtime...");
+    let runtime: Runtime = match Builder::new_multi_thread().enable_io().enable_time().build() {
+        Ok(runtime) => runtime,
+        Err(err) => {
+            error!("{}", trace!(("Failed to create tokio runtime"), err));
+            std::process::exit(1);
+        },
+    };
+    std::process::exit(runtime.block_on(async move {
+        // Bind a listener on the specified address for the server
+        debug!("Binding server listener to '{}'...", args.address);
+        let listener: TcpListener = match TcpListener::bind(args.address).await {
+            Ok(listener) => listener,
+            Err(err) => {
+                error!("{}", trace!(("Failed to bind to '{}'", args.address), err));
+                return 1;
+            },
+        };
+
+        // Build a listener for SIGTERM
+        debug!("Registering SIGTERM handler...");
+        let mut sigterm: Signal = match signal(SignalKind::terminate()) {
+            Ok(handler) => handler,
+            Err(err) => {
+                error!("{}", trace!(("Failed to create SIGTERM handler"), err));
+                return 1;
+            },
+        };
+
+        // Run the server in a loop while alternating with listening for signals
+        info!("Initialization complete, entering game loop");
+        tokio::select! {
+            // Let the server handle the stuff
+            res = axum::serve(listener, routes.into_make_service_with_connect_info::<SocketAddr>()).into_future() => match res {
+                Ok(_) => 0,
+                Err(err) => {
+                    error!("{}", trace!(("Failed to run axum server"), err));
+                    1
+                }
+            },
+
+            // Wait for SIGTERM to be super Docker-friendly
+            _ = sigterm.recv() => 0,
+        }
+    }));
 }
