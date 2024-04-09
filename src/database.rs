@@ -4,7 +4,7 @@
 //  Created:
 //    06 Apr 2024, 15:26:16
 //  Last edited:
-//    09 Apr 2024, 12:00:12
+//    09 Apr 2024, 12:49:30
 //  Auto updated?
 //    Yes
 //
@@ -183,6 +183,7 @@ pub struct UserInfo {
 /// A database abstraction for the DnD server.
 ///
 /// Currently, the only possible abstraction is one over an SQLite database, implemented with the [`async_sqlite`] crate.
+#[derive(Debug)]
 pub enum Database {
     SQLite {
         /// The path to the database file we use for debugging.
@@ -304,6 +305,48 @@ impl Database {
                 let query: &'static str = "SELECT * FROM users WHERE id=?";
                 match conn
                     .query_row(query, [id], |row| {
+                        Ok(UserInfo {
+                            id:    row.get("id")?,
+                            name:  row.get("name")?,
+                            pass:  row.get("password")?,
+                            role:  row.get::<&'static str, u8>("role")?.try_into().expect("Got invalid role in database"),
+                            added: row.get("added")?,
+                        })
+                    })
+                    .optional()
+                {
+                    Ok(info) => Ok(info),
+                    Err(err) => Err(Error::SQLite(SQLiteError::QueryExecute { path: path.clone(), query: query.into(), err })),
+                }
+            },
+        }
+    }
+
+    /// Retrieves a [`UserInfo`] describing the properties of a user.
+    ///
+    /// # Arguments
+    /// - `name`: The name of the user to retrieve the info for.
+    ///
+    /// # Returns
+    /// A [`UserInfo`] describing it all, or else [`None`] if we didn't found such a user.
+    ///
+    /// # Errors
+    /// This function may error if we failed to communicate with the database.
+    pub fn get_user_by_name(&self, name: impl AsRef<str>) -> Result<Option<UserInfo>, Error> {
+        let name: &str = name.as_ref();
+        debug!("Retrieving user info by name for user '{name}'...");
+        match self {
+            Self::SQLite { path } => {
+                // Create a connection
+                let conn: Connection = match Connection::open(&path) {
+                    Ok(conn) => conn,
+                    Err(err) => return Err(Error::SQLite(SQLiteError::ConnCreate { path: path.clone(), err })),
+                };
+
+                // Run the query
+                let query: &'static str = "SELECT * FROM users WHERE name=?";
+                match conn
+                    .query_row(query, [name], |row| {
                         Ok(UserInfo {
                             id:    row.get("id")?,
                             name:  row.get("name")?,

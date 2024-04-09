@@ -4,7 +4,7 @@
 //  Created:
 //    08 Apr 2024, 11:36:08
 //  Last edited:
-//    08 Apr 2024, 12:29:44
+//    09 Apr 2024, 12:37:13
 //  Auto updated?
 //    Yes
 //
@@ -22,7 +22,6 @@ use chrono::{DateTime, Utc};
 use enum_debug::EnumDebug;
 use error_trace::trace;
 use log::debug;
-use parking_lot::RwLockReadGuard;
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
 
@@ -78,16 +77,8 @@ impl Error for PasswordError {
 /// Define errors originating from token managing/checking.
 #[derive(Debug)]
 pub enum TokenError {
-    /// Failed to deserialize some string as a [`LoginToken`].
-    Deserialize { raw: String, err: serde_json::Error },
-    /// The given token has expired.
-    Expired { id: u64, age: i64, valid_time: i64 },
-    /// A token carried a role that didn't make sense.
-    IncorrectRole { id: u64, got: Role, expected: Role },
     /// Failed to serialize the given login token.
     Serialize { err: serde_json::Error },
-    /// A user presented a token for a user that was deleted (or at least, not in the DB).
-    UserNotFound { id: u64 },
     /// Failed to get the info for a certain user.
     UserInfoRetrieve { id: u64, err: crate::database::Error },
 }
@@ -95,6 +86,39 @@ impl Display for TokenError {
     #[inline]
     fn fmt(&self, f: &mut Formatter) -> FResult {
         use TokenError::*;
+        match self {
+            Serialize { .. } => write!(f, "Failed to serialize login token"),
+            UserInfoRetrieve { id, .. } => write!(f, "Failed to retrieve UserInfo for user {id} from database"),
+        }
+    }
+}
+impl Error for TokenError {
+    #[inline]
+    fn source(&self) -> Option<&(dyn 'static + Error)> {
+        use TokenError::*;
+        match self {
+            Serialize { err } => Some(err),
+            UserInfoRetrieve { err, .. } => Some(err),
+        }
+    }
+}
+
+/// Defines reasons why a given token is invalid.
+#[derive(Debug)]
+pub enum TokenInvalid {
+    /// Failed to deserialize some string as a [`LoginToken`].
+    Deserialize { raw: String, err: serde_json::Error },
+    /// The given token has expired.
+    Expired { id: u64, age: i64, valid_time: i64 },
+    /// A token carried a role that didn't make sense.
+    IncorrectRole { id: u64, got: Role, expected: Role },
+    /// A user presented a token for a user that was deleted (or at least, not in the DB).
+    UserNotFound { id: u64 },
+}
+impl Display for TokenInvalid {
+    #[inline]
+    fn fmt(&self, f: &mut Formatter) -> FResult {
+        use TokenInvalid::*;
         match self {
             Deserialize { raw, .. } => {
                 write!(
@@ -111,23 +135,19 @@ impl Display for TokenError {
             IncorrectRole { id, got, expected } => {
                 write!(f, "User {id} role in token does not match role in database (got {}, expected {})", got.variant(), expected.variant())
             },
-            Serialize { .. } => write!(f, "Failed to serialize login token"),
             UserNotFound { id } => write!(f, "User {id} in token not found"),
-            UserInfoRetrieve { id, .. } => write!(f, "Failed to retrieve UserInfo for user {id} from database"),
         }
     }
 }
-impl Error for TokenError {
+impl Error for TokenInvalid {
     #[inline]
     fn source(&self) -> Option<&(dyn 'static + Error)> {
-        use TokenError::*;
+        use TokenInvalid::*;
         match self {
             Deserialize { err, .. } => Some(err),
             Expired { .. } => None,
             IncorrectRole { .. } => None,
-            Serialize { err } => Some(err),
             UserNotFound { .. } => None,
-            UserInfoRetrieve { err, .. } => Some(err),
         }
     }
 }
@@ -244,12 +264,12 @@ pub fn create_token(id: u64, role: Role) -> Result<String, TokenError> {
 /// - `token`: Some opaque string token that we will check.
 ///
 /// # Returns
-/// A [`LoginToken`] that describes the information extracted from the `token`.
+/// A [`LoginToken`] that describes the information extracted from the `token`, or [`Err`] describing why the token was no longer valid.
 ///
 /// # Errors
-/// This function errors if the given token was not valid somehow.
+/// This function errors if we failed to use the given database.
 #[inline]
-pub fn check_token(database: RwLockReadGuard<Database>, token: &str) -> Result<LoginToken, TokenError> {
+pub fn check_token(database: &Database, token: &str) -> Result<Result<LoginToken, TokenInvalid>, TokenError> {
     match serde_json::from_str::<LoginToken>(token) {
         Ok(token) => {
             debug!("Got presented login token '{token:?}'");
@@ -258,7 +278,7 @@ pub fn check_token(database: RwLockReadGuard<Database>, token: &str) -> Result<L
             let age: i64 = (Utc::now() - token.issued).num_minutes();
             if age > TOKEN_VALID_TIME_MIN {
                 // Assume not logged-in
-                return Err(TokenError::Expired { id: token.id, age, valid_time: TOKEN_VALID_TIME_MIN });
+                return Ok(Err(TokenInvalid::Expired { id: token.id, age, valid_time: TOKEN_VALID_TIME_MIN }));
             }
 
             // Then check if we can get the user from the database
@@ -266,15 +286,15 @@ pub fn check_token(database: RwLockReadGuard<Database>, token: &str) -> Result<L
                 Ok(Some(user)) => {
                     // Finally, check if the role in the token is what we know of the user in the database
                     if user.role == token.role {
-                        Ok(token)
+                        Ok(Ok(token))
                     } else {
-                        Err(TokenError::IncorrectRole { id: user.id, got: token.role, expected: user.role })
+                        Ok(Err(TokenInvalid::IncorrectRole { id: user.id, got: token.role, expected: user.role }))
                     }
                 },
-                Ok(None) => Err(TokenError::UserNotFound { id: token.id }),
+                Ok(None) => Ok(Err(TokenInvalid::UserNotFound { id: token.id })),
                 Err(err) => Err(TokenError::UserInfoRetrieve { id: token.id, err }),
             }
         },
-        Err(err) => Err(TokenError::Deserialize { raw: token.into(), err }),
+        Err(err) => Ok(Err(TokenInvalid::Deserialize { raw: token.into(), err })),
     }
 }

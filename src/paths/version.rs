@@ -4,7 +4,7 @@
 //  Created:
 //    08 Apr 2024, 17:36:28
 //  Last edited:
-//    09 Apr 2024, 12:16:50
+//    09 Apr 2024, 12:49:53
 //  Auto updated?
 //    Yes
 //
@@ -14,12 +14,12 @@
 //
 
 use std::borrow::Cow;
-use std::sync::Arc;
+use std::net::SocketAddr;
 
-use axum::extract::State;
+use axum::extract::{ConnectInfo, State};
 use axum::response::Json;
 use hyper::StatusCode;
-use log::debug;
+use log::info;
 use semver::Version;
 use serde::{Deserialize, Serialize};
 
@@ -50,11 +50,12 @@ pub struct VersionResponse<'a> {
 ///
 /// # Arguments
 /// - `state`: The shared [`ServerState`] between paths.
+/// - `client`: The address of the client we're working with.
 ///
 /// # Returns
 /// `200 OK` with a [`VersionResponse`] in the body.
 #[cfg_attr(feature = "axum-debug", axum_macros::debug_handler)]
-pub async fn handle(State(state): State<Arc<ServerState>>) -> (StatusCode, Json<VersionResponse<'static>>) {
-    debug!("Handling {} {}", PATH.method, PATH.path);
+pub async fn handle(State(state): State<ServerState>, ConnectInfo(client): ConnectInfo<SocketAddr>) -> (StatusCode, Json<VersionResponse<'static>>) {
+    info!("Handling {} {} from '{}'", PATH.method, PATH.path, client);
     (StatusCode::OK, Json::from(VersionResponse { name: Cow::Borrowed(state.name), version: state.version.clone() }))
 }

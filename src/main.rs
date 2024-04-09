@@ -4,7 +4,7 @@
 //  Created:
 //    06 Apr 2024, 15:12:56
 //  Last edited:
-//    09 Apr 2024, 12:13:45
+//    09 Apr 2024, 12:50:08
 //  Auto updated?
 //    Yes
 //
@@ -17,9 +17,8 @@ use std::future::IntoFuture as _;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::str::FromStr as _;
-use std::sync::Arc;
 
-use axum::routing::get;
+use axum::routing::{get, post};
 use axum::Router;
 use clap::Parser;
 use dnd_server::database::Database;
@@ -113,12 +112,13 @@ fn main() {
 
     /* PATH BUILDING */
     // Create a runtime state out of that
-    let state: Arc<ServerState> = ServerState::arced(env!("CARGO_BIN_NAME"), Version::from_str(env!("CARGO_PKG_VERSION")).unwrap(), db);
+    let state: ServerState = ServerState::new(env!("CARGO_BIN_NAME"), Version::from_str(env!("CARGO_PKG_VERSION")).unwrap(), db);
 
     // Build the health path
     debug!("Building axum paths...");
+    let auth: Router = Router::new().route("/auth/login", post(paths::auth::login)).with_state(state.clone());
     let version: Router = Router::new().route("/version", get(paths::version::handle)).with_state(state);
-    let routes: Router = Router::new().nest("/v1", version);
+    let routes: Router = Router::new().nest("/v1", auth).nest("/v1", version);
 
 
 

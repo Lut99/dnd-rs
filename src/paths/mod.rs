@@ -4,7 +4,7 @@
 //  Created:
 //    08 Apr 2024, 11:44:19
 //  Last edited:
-//    08 Apr 2024, 17:36:08
+//    09 Apr 2024, 12:18:35
 //  Auto updated?
 //    Yes
 //
@@ -13,4 +13,5 @@
 //
 
 // Define the submodules defining the paths
+pub mod auth;
 pub mod version;
